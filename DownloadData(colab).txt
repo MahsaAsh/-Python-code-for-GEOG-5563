@@ -1,0 +1,59 @@
+from google.colab import files
+uploaded = files.upload()  # Upload a CSV file containing the list of sensor indices
+
+import pandas as pd
+
+# Read the uploaded CSV file
+df = pd.read_csv("Sensors.csv")
+
+# Extract sensor_index values, remove any missing data, and convert to integer list
+sensor_indexes = df["sensor_index"].dropna().astype(int).tolist()
+
+print(f"{len(sensor_indexes)} sensors loaded.")
+
+import requests
+import os
+
+# Define API key and request parameters
+API_KEY = "7B09875B-15BB-11F0-81BE-42010A80001F"
+start_timestamp = 1704067200        # Start of 2024 (Jan 1)
+end_timestamp = 1735689599          # End of 2024 (Dec 31)
+average = 1440                      # Average period in minutes (1440 = daily average)
+fields = "pm2.5_atm"                # Field to request from API
+
+# Create a folder to store downloaded sensor data
+os.makedirs("data", exist_ok=True)
+
+# Loop through each sensor index and download its data from PurpleAir
+for sensor_index in sensor_indexes:
+    url = f"https://api.purpleair.com/v1/sensors/{sensor_index}/history/csv"
+    params = {
+        "start_timestamp": start_timestamp,
+        "end_timestamp": end_timestamp,
+        "average": average,
+        "fields": fields
+    }
+    headers = {
+        "X-API-Key": API_KEY
+    }
+
+    print(f"Downloading data for sensor {sensor_index}...")
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 200:
+        # Save the CSV content if request is successful
+        filename = f"data/sensor_{sensor_index}.csv"
+        with open(filename, "wb") as f:
+            f.write(response.content)
+        print(f"Saved: {filename}")
+    else:
+        print(f"Error for sensor {sensor_index}: {response.status_code}")
+
+import shutil
+from google.colab import files
+
+# Create a ZIP archive of all downloaded CSV files
+shutil.make_archive("purpleair_data", 'zip', "data")
+
+# Download the ZIP file to local machine
+files.download("purpleair_data.zip")
